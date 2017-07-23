@@ -116,16 +116,21 @@ class WX:
                         money_msg = text.replace(https_result[i], skuurl)
                         text = money_msg
                         url_img = self.qwd.get_img(skuid)
-                        print skuid, skuurl, text, url_img
+
+                        # XXX: Directly send image buffer
+                        '''
                         image_storage = io.BytesIO()
                         get_image(image_storage, url_img)
                         '''
                         img = 'img/{0}.jpg'.format(skuid)
                         if not os.path.exists('img'):
                             os.mkdir('img')
-                        '''
-                        #with codecs.open(img, 'wb') as f:
-                        #    f.write(urllib2.urlopen(url_img).read())
+
+                        with codecs.open(img, 'wb') as f:
+                            f.write(urllib2.urlopen(url_img).read())
+
+                        print skuid, skuurl, text, url_img, img
+
                     if skuid not in list(self.set_skuid):
 
                         self.set_skuid.add(skuid)
@@ -141,14 +146,16 @@ class WX:
                             print ret, text
 
                             time.sleep(interval)
-                            #aaaa = itchat.send_image(img, toUserName=ng_id[j], mediaId=skuid)
-                            #aaaa = itchat.send_image(image_storage, toUserName=self.ng_id[j], mediaId=skuid)
-                            ret = group.send_image(image_storage)
+
+                            # XXX: Directly send image buffer
+                            #ret = group.send_image(image_storage)
+                            ret = group.send_image(img)
                             print ret
                             # if len(aaaa['BaseResponse']['ErrMsg']) == 0:
                             #      itchat.send("@img@%s".format(img))
 
-                    image_storage.close()
+                    # XXX: Directly send image buffer
+                    #image_storage.close()
 
                         # print(int(random.random() * 500))
                         # time.sleep(int(random.random() * 500))
