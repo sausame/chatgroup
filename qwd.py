@@ -1,9 +1,12 @@
 # -*- coding:utf-8 -*-
 
+import json
 import random
 import re
 import requests
 import urllib2
+
+from utils import getMatchString, getProperty
 
 class CPS:
 
@@ -18,87 +21,118 @@ class CPS:
 
 class QWD:
 
-    def __init__(self, configFile=None):
+    def __init__(self, configFile):
+
+        self.configFile = configFile
 
         self.jxjpin = ''   ##用户名
         self.pinType = ''   ##通过url获取
         self.apptoken = ''   ##网站的tocken
 
-        self.appid = '161'   ##app的id
-        self.ctype = 'apple' ##客户端类型
-        self.ie = 'utf-8'    ##字符集
-        self.p = '1'         ##默认为1
-        #pin = '18910148469_p'   ##账户名
-        #tgt = 'AAFZKaOcAEA3VM9HrqXNMOHF621Aa-dp-v2WqwOGp4vgIaHdQrTlpHnRIWIbu6wodpHNAUeQSHjutqZKM27_9h3KgDD1bbkR'    ###我的理解是加密密码，通过抓包取得
+        self.appid = getProperty(self.configFile, 'cps-qwd-appid')
+        self.ctype = getProperty(self.configFile, 'cps-qwd-ctype')
+        self.ie = getProperty(self.configFile, 'cps-qwd-ie')
+        self.p = getProperty(self.configFile, 'cps-qwd-p')
+        self.uuid = getProperty(self.configFile, 'cps-qwd-uuid')
 
-        #pin = 'sausame'
-        #tgt = 'AAFZbKu8AED13SyRWYSyxryS607Ko-pAfHLy6Q6M-nVbK0V56nplwdnZlFotxalv5s_uZ0jiKV2BGhQABmpcYJTmvOrvjYP3'
+        self.pin = getProperty(self.configFile, 'cps-qwd-pin')
+        self.tgt = getProperty(self.configFile, 'cps-qwd-tgt')
 
-        #pin = 'sausame'
-        #tgt = 'AAFZbKyoAEDWaJEBE7AbPws1L6W50OAGLB4EtgT1wnefwWmjQbBiE1E9WvgUq9R3HgqKH_6dVY1uETPj5xxOXyjfrvL-u7ET'
+        self.shareUrl = getProperty(self.configFile, 'cps-qwd-share-url')
+        self.imageUrl = getProperty(self.configFile, 'cps-qwd-share-image-url')
 
-        self.pin = 'jd_7d7714f53cba9'
-        self.tgt = 'AAFZbKwFAEAALdMmvd6rioPDM22up9AEREocUbmRk3LF4gkpDA0GGRuFboCPi_L9GJmoDZxPNpUE1tBzK7EnM2TEcyWkTcSx'
+        self.shareCookie = getProperty(self.configFile, 'cps-qwd-share-cookie')
 
-        self.uuid = '69D9E50C-3D8C-4CFE-BC2F-D1D65BB3C14D'   ##uuid   ##uuid
+        self.userAgent = getProperty(self.configFile, 'cps-qwd-http-user-agent')
 
     def login(self):
-        # appid=161&ctype=apple&ie=utf-8&p=1&pin=xiongruhao&tgt=AAFZO6BoAEDiYZogkABc17kbYW9Nb721f5u0njKAUTVrOhcHBV6kHCvJZpo5XCf4cm0e5ekOCfNRZ1XMRTunnJ3hGi_AqBx5&uuid=69D9E50C-3D8C-4CFE-BC2F-D1D65BB3C14D
-        data = 'appid={0}&ctype={1}&ie={2}&p={3}&pin={4}&tgt={5}&uuid={6}'.format(self.appid,
-                self.ctype, self.ie, self.p, self.pin, self.tgt, self.uuid)
 
-        # print(data)
-        url = 'https://qwd.jd.com/cgi-bin/qwd_app_login'
+        # Url
+        url = getProperty(self.configFile, 'cps-qwd-login-url')
+
+        # Data
+        scheme = getProperty(self.configFile, 'cps-qwd-login-data')
+        print scheme
+        data = scheme.format(self)
+
+        # Request
         req = urllib2.Request(url=url, data=data)
         res = urllib2.urlopen(req)
-        html = res.read()
 
-        if html.find(r'msg": "pin login success') > 10:
-            # 获得apptoken
-            reg_apptoken = r'apptoken": "(.*?)",'
-            self.apptoken = str(re.findall(reg_apptoken, html)[0])
-            # print(apptoken)
-            # 获得pinType
-            reg_pinType = r'pinType": "(.*?)",'
-            self.pinType = str(re.findall(reg_pinType, html)[0])
-            # 获得jxjpin
-            reg_jxjpin = r'jxjpin": "(.*?)",'
-            self.jxjpin = str(re.findall(reg_jxjpin, html)[0])
-            print('#########Welecome to qwd.jd.com!######################')
-        else:
-            print 'Failed to login to qwd:\n', html
+        response = res.read()
+        print url, data
+
+        with open('a.json', 'w+') as fp:
+            fp.write(response)
+
+        obj = json.loads(response.decode('utf-8', 'ignore'))
+
+        # Login status
+        errCode = int(obj.pop('errCode'))
+
+        if errCode is not 0:
+            print 'Failed to login to', url, ':\n', response
+            return False
+
+        print('Logined to qwd.jd.com')
+
+        obj = obj.pop('loginInfo')
+
+        self.apptoken = obj.pop('apptoken')
+        self.pinType = obj.pop('pinType')
+        self.jxjpin = obj.pop('jxjpin')
+
+        return True
 
     def getShareUrl(self, skuid):
 
-        url = 'https://qwd.jd.com/fcgi-bin/qwd_itemshare?skuid={0}&type=1'.format(skuid)
-        req = urllib2.Request(url)
-        cookie = 'app_id={0}; apptoken={1}; client_type={2}; jxjpin={3}; pinType={4}; tgt={5}; qwd_chn=99; qwd_schn=2; login_mode=1;'.format(self.appid, self.apptoken, self.ctype, self.jxjpin, self.pinType, self.tgt)
-        # print(cookie)
-        req.add_header('Cookie', cookie)
-        req.add_header('User-Agent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 10_2_1 like Mac OS X) AppleWebKit/602.4.6 (KHTML, like Gecko) Mobile/14D27 (5715086848) JXJ/1.3.5.70426')
-        res = urllib2.urlopen(req)
-        html = res.read()
-        # print(html)
-        reg_skuurl = r'"skuurl":"(.*?)"'
-        skuurl = str(re.findall(reg_skuurl, html)[0])
-        # print(skuurl)
-        return skuurl
+        url = self.shareUrl.format(skuid)
 
-    @staticmethod
-    def get_skuid(url, configFile=None):
+        cookie = self.shareCookie.format(self)
+
         req = urllib2.Request(url)
-        req.add_header('User-Agent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 5_1 like Mac OS X) AppleWebKit/534.46 (KHTML, like Gecko) Mobile/9B176 MicroMessenger/4.3.2')
+
+        req.add_header('Cookie', cookie)
+        req.add_header('User-Agent', self.userAgent)
+
         res = urllib2.urlopen(req)
         html = res.read()
-        reg1 = r"hrl='(.*?)'"
-        url_skuid = re.findall(reg1, html)[0]
-        request = urllib2.Request(url_skuid)
-        request.add_header('User-Agent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 5_1 like Mac OS X) AppleWebKit/534.46 (KHTML, like Gecko) Mobile/9B176 MicroMessenger/4.3.2')
-        result = urllib2.urlopen(request).read()
-        reg_id = r'"areaSkuId":"(\d+)"'
-        skuid = str(re.findall(reg_id, result)[0])
-        # print(skuid)
-        return skuid
+
+        return getMatchString(html, r'"skuurl":"(.*?)"')
+
+    def getSkuId(self, url):
+
+        req = urllib2.Request(url)
+        req.add_header('User-Agent', self.userAgent)
+
+        res = urllib2.urlopen(req)
+        html = res.read()
+
+        with open('b.html', 'w+') as fp:
+            fp.write(html)
+
+        url = getMatchString(html, r"hrl='(.*?)'")
+        print url
+
+        req = urllib2.Request(url)
+        req.add_header('User-Agent', self.userAgent)
+
+        res = urllib2.urlopen(req)
+        html = res.read()
+
+        data = getMatchString(html, r'window._itemOnly = (.*?);')
+
+        with open('c.html', 'w+') as fp:
+            fp.write(html)
+
+        print data
+
+        obj = json.loads(data.decode('utf-8', 'ignore'))
+        obj = obj.pop('item')
+
+        skuId = obj.pop('areaSkuId')
+
+        return skuId
 
     @staticmethod
     def check_msg(msg):
@@ -111,35 +145,36 @@ class QWD:
 
     @staticmethod
     def get_new_msg(msg, result):
+
         text = ''
         for i in range(len(result)):
             req = urllib2.Request(str(result[i]))
             res = urllib2.urlopen(req)
             html = res.read()
-            reg1 = r"hrl='https://union-click\.jd\.com\S+&d=(\S\S\S\S\S\S)'"
-            result1 = re.findall(reg1, html)[0]
-            # print(result1)
-            url = 'https://union-click.jd.com/jdc?d=' + str(result1)
-            # print(url)
+            reg = r"hrl='https://union-click\.jd\.com\S+&d=(\S\S\S\S\S\S)'"
+            result = re.findall(reg, html)[0]
+
+            url = 'https://union-click.jd.com/jdc?d=' + str(result)
+
             text = msg.replace(str(result[i]), url)
             msg = text
-            # print(text)
-            # print('aaaaaaaaaaaaaaaaaaa')
+
         return text
 
-    def get_img(self, skuid):
-        g_tk = str(random.randint(1000000000, 9999999999))
-        url = 'https://qwd.jd.com/fcgi-bin/qwd_searchitem_ex?g_tk=&pageindex=1&pagesize=20&key={1}'.format(g_tk, skuid)
+    def getImage(self, skuid):
+
+        url = self.imageUrl.format(random.randint(1000000000, 9999999999), skuid)
         req = urllib2.Request(url)
-        cookie = 'app_id={0}; apptoken={1}; client_type={2}; jxjpin={3}; pinType={4}; tgt={5}; qwd_chn=99; qwd_schn=2; login_mode=1;'.format(self.appid, self.apptoken, self.ctype, self.jxjpin, self.pinType, self.tgt)
-        # print(cookie)
+
+        cookie = self.shareCookie.format(self)
+
         req.add_header('Cookie', cookie)
-        req.add_header('User-Agent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 10_2_1 like Mac OS X) AppleWebKit/602.4.6 (KHTML, like Gecko) Mobile/14D27 (5715086848) JXJ/1.3.5.70426')
+        req.add_header('User-Agent', self.userAgent)
+
         res = urllib2.urlopen(req)
         html = res.read()
-        # print(html)
-        reg_img = r'skuimgurl":"(https://img\S+)",'
-        img = str(re.findall(reg_img, html)[0])
-        # print(skuurl)
+
+        img = getMatchString(html, r'skuimgurl":"(https://img\S+)",')
+
         return img
 

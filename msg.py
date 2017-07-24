@@ -14,6 +14,7 @@ import time
 
 from itchat.content import TEXT
 from qwd import QWD
+from utils import getProperty
 
 class Message:
 
@@ -39,12 +40,12 @@ class Message:
             return None
 
         for i in range(len(https_result)):
-            self.skuid = QWD.get_skuid(str(https_result[i]))
+            self.skuid = self.qwd.getSkuId(str(https_result[i]))
             skuurl = self.qwd.getShareUrl(self.skuid)
             money_msg = text.replace(https_result[i], skuurl)
             self.text = money_msg
 
-            url_img = self.qwd.get_img(self.skuid)
+            url_img = self.qwd.getImage(self.skuid)
 
             self.img = 'img/{0}.jpg'.format(self.skuid)
             if not os.path.exists('img'):
@@ -59,9 +60,11 @@ class Message:
 
 class MessageCenter:
 
-    def __init__(self, configFile=None):
+    def __init__(self, configFile):
 
-        self.qwd = QWD()
+        self.configFile = configFile
+
+        self.qwd = QWD(configFile)
         self.qwd.login()
 
     def translate(self, msg):

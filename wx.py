@@ -12,28 +12,32 @@ import datetime
 import itchat
 import time
 
-from itchat.content import TEXT
 from msg import MessageCenter
+from utils import getProperty
 
 class WX:
 
-    def __init__(self, configFile=None):
+    def __init__(self, configFile):
 
-        #self.jk_name = ['京东员工内购群(凌)','得得']
-        self.jk_name = ['得得']
+        self.configFile = configFile
+
+        self.jk_name = getProperty(self.configFile, 'wechat-input-groups').split(';')
         self.jk_id = list()
-        # 自己促销群
-        self.ng_name = ['啊啊啊啊']
+
+        self.ng_name = getProperty(self.configFile, 'wechat-output-groups').split(';')
         self.ng_id = list()
+
         self.set_skuid = set([])
 
         self.toGroups = list()
 
-        self.messageCenter = MessageCenter()
+        self.messageCenter = MessageCenter(configFile)
 
     def login(self):
 
-        itchat.auto_login(hotReload=True, statusStorageDir='status.pkl')
+        statusFile = getProperty(self.configFile, 'wechat-status-file')
+
+        itchat.auto_login(hotReload=True, statusStorageDir=statusFile)
 
         for name in self.ng_name:
             group = itchat.search_chatrooms(name=name)
@@ -50,17 +54,8 @@ class WX:
             jk_list.append(itchat.search_chatrooms(name=self.jk_name[i]))
             # print(jk_list)
             jk_id.append(jk_list[i][0]['UserName'])
-        return jk_id
 
-    def get_ng_id(self):
-        ng_list = []
-        zj_id = []
-        print(len(self.ng_name))
-        for i in range(len(self.ng_name)):
-            ng_list.append(itchat.search_chatrooms(name=self.ng_name[i]))
-            zj_id.append(ng_list[i][0]['UserName'])
-        print zj_id
-        return zj_id
+        return jk_id
 
     def text(self, msg):
 
@@ -77,9 +72,6 @@ class WX:
         text = ''
         if len(self.jk_id) != len(self.jk_name):
             self.jk_id = self.get_jkid()
-
-        if len(self.ng_id) != len(self.ng_name):
-            self.ng_id = self.get_ng_id()
 
         print msg['Content']
 
@@ -112,5 +104,4 @@ class WX:
 
                     ret = group.send_image(message.img)
                     print 'Send', message.img, ':', ret
-
 

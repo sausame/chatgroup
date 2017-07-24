@@ -15,8 +15,14 @@ if __name__ == '__main__':
     reload(sys)
     sys.setdefaultencoding('utf8')
 
+    if len(sys.argv) < 2:
+        print 'Usage:\n\t', sys.argv[0], 'config-file\n'
+        exit()
+
+    configFile = sys.argv[1]
+
     global wx
 
-    wx = WX()
+    wx = WX(configFile)
     wx.login()
 
