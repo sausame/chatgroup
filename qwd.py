@@ -5,7 +5,7 @@ import json
 import random
 import re
 import requests
-import urllib2
+import time
 
 from utils import getMatchString, getProperty
 
@@ -26,14 +26,14 @@ class QWD:
 
         self.configFile = configFile
 
-        self.jxjpin = ''   ##用户名
-        self.pinType = ''   ##通过url获取
-        self.apptoken = ''   ##网站的tocken
-
         self.appid = getProperty(self.configFile, 'cps-qwd-appid')
         self.ctype = getProperty(self.configFile, 'cps-qwd-ctype')
         self.ie = getProperty(self.configFile, 'cps-qwd-ie')
         self.p = getProperty(self.configFile, 'cps-qwd-p')
+        self.qwd_chn = getProperty(self.configFile, 'cps-qwd-qwd_chn')
+        self.qwd_schn = getProperty(self.configFile, 'cps-qwd-qwd_schn')
+        self.login_mode = getProperty(self.configFile, 'cps-qwd-login_mode')
+
         self.uuid = getProperty(self.configFile, 'cps-qwd-uuid')
 
         self.pin = getProperty(self.configFile, 'cps-qwd-pin')
@@ -46,22 +46,28 @@ class QWD:
 
         self.userAgent = getProperty(self.configFile, 'cps-qwd-http-user-agent')
 
+        #XXX: Can NOT use session to store cookie because these fields are not
+        #     valid http cookie.
+        self.cookies = dict()
+
     def login(self):
 
         # Url
         url = getProperty(self.configFile, 'cps-qwd-login-url')
 
         # Data
-        scheme = getProperty(self.configFile, 'cps-qwd-login-data')
-        print scheme
-        data = scheme.format(self)
+        data = {'appid': self.appid,
+                'ctype': self.ctype,
+                'ie': self.ie,
+                'p': self.p,
+                'pin': self.pin,
+                'tgt': self.tgt,
+                'uuid': self.uuid}
 
         # Request
-        req = urllib2.Request(url=url, data=data)
-        res = urllib2.urlopen(req)
-
-        response = res.read()
-        print url, data
+        r = requests.post(url, data=data)
+        response = r.content
+        #print url, data, r.cookies, response
 
         with open('a.json', 'w+') as fp:
             fp.write(response)
@@ -83,55 +89,73 @@ class QWD:
         self.pinType = obj.pop('pinType')
         self.jxjpin = obj.pop('jxjpin')
 
+        self.cookies = {'app_id': self.appid,
+                'apptoken': self.apptoken,
+                'client_type': self.ctype,
+                'jxjpin': self.jxjpin,
+                'pinType': self.pinType,
+                'tgt': self.tgt,
+                'qwd_chn': self.qwd_chn,
+                'qwd_schn': self.qwd_schn,
+                'login_mode': self.login_mode}
+
         return True
 
     @staticmethod
     def isValidShareUrl(url):
+
         pattern = r'(https://union-click\.jd\.com/jdc\?d=\w+)'
+
         return re.match(pattern, url) is not None
 
     def getShareUrl(self, skuid):
 
         url = self.shareUrl.format(skuid)
 
-        cookie = self.shareCookie.format(self)
+        headers = {'User-Agent': self.userAgent}
 
-        req = urllib2.Request(url)
+        r = requests.get(url, cookies=self.cookies, headers=headers)
 
-        req.add_header('Cookie', cookie)
-        req.add_header('User-Agent', self.userAgent)
+        if 200 != r.status_code:
+            print 'Unable to get sharing URL for "', skuid, '" with an error (', r.status_code, '):\n', r.text
+            return None
 
-        res = urllib2.urlopen(req)
-        html = res.read()
+        content = r.content.replace('\n', '')
+        data = getMatchString(content, r'itemshare\((.*?)\)')
 
-        return getMatchString(html, r'"skuurl":"(.*?)"')
+        obj = json.loads(data.decode('utf-8', 'ignore'))
+        retCode = int(obj.pop('retCode'))
+
+        if retCode is not 0:
+            print 'Unable to get sharing URL for "', skuid, '" with an error (', r.status_code, '):\n', r.text
+
+            # XXX: Relogin, but let this message failed because of less complicated logistic
+            self.login() 
+            return None
+
+        return obj.pop('skuurl')
 
     def getSkuId(self, url):
 
-        req = urllib2.Request(url)
-        req.add_header('User-Agent', self.userAgent)
+        headers = {'User-Agent': self.userAgent}
+        r = requests.get(url, headers=headers)
 
-        res = urllib2.urlopen(req)
-        html = res.read()
+        if 200 != r.status_code:
+            print 'Unable to get long URL for "', skuid, '" with an error (', r.status_code, '):\n', r.text
+            return None
 
-        with open('b.html', 'w+') as fp:
-            fp.write(html)
+        url = getMatchString(r.content, r"hrl='(.*?)'")
+        #print 'Long url:', url
 
-        url = getMatchString(html, r"hrl='(.*?)'")
-        print url
+        headers = {'User-Agent': self.userAgent}
+        r = requests.get(url, headers=headers)
 
-        req = urllib2.Request(url)
-        req.add_header('User-Agent', self.userAgent)
+        if 200 != r.status_code:
+            print 'Unable to get information page for "', skuid, '" with an error (', r.status_code, '):\n', r.text
+            return None
 
-        res = urllib2.urlopen(req)
-        html = res.read()
-
-        data = getMatchString(html, r'window._itemOnly = (.*?);')
-
-        with open('c.html', 'w+') as fp:
-            fp.write(html)
-
-        print data
+        data = getMatchString(r.content, r'window._itemOnly = (.*?);')
+        #print data
 
         obj = json.loads(data.decode('utf-8', 'ignore'))
         obj = obj.pop('item')
@@ -140,27 +164,35 @@ class QWD:
 
         return skuId
 
-    def getImage(self, skuid):
+    def getImageUrl(self, skuid):
 
         url = self.imageUrl.format(random.randint(1000000000, 9999999999), skuid)
-        req = urllib2.Request(url)
+        headers = {'User-Agent': self.userAgent}
 
-        cookie = self.shareCookie.format(self)
+        r = requests.get(url, headers=headers)
 
-        req.add_header('Cookie', cookie)
-        req.add_header('User-Agent', self.userAgent)
+        if 200 != r.status_code:
+            print 'Unable to get image URL for "', skuid, '" with an error (', r.status_code, '):\n', r.text
+            return None
 
-        res = urllib2.urlopen(req)
-        html = res.read()
-
-        img = getMatchString(html, r'skuimgurl":"(https://img\S+)",')
+        img = getMatchString(r.content, r'skuimgurl":"(https://img\S+)",')
 
         return img
 
     def saveImage(self, path, skuid):
 
-        with codecs.open(path, 'wb') as fp:
+        url = self.getImageUrl(skuid)
+        if url is None:
+            return False
 
-            url = self.getImage(skuid)
-            fp.write(urllib2.urlopen(url).read())
+        r = requests.get(url)
+
+        if 200 != r.status_code:
+            print 'Unable to get image data for "', skuid, '" with an error (', r.status_code, '):\n', r.text
+            return False
+
+        with codecs.open(path, 'wb') as fp:
+            fp.write(r.content)
+
+        return True
 

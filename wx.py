@@ -1,7 +1,6 @@
 # -*- coding:utf-8 -*-
 
 import random
-import requests
 import itchat
 import time
 
