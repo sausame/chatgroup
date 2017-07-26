@@ -1,7 +1,8 @@
 # Utils
-
+import cStringIO
 import json
 import os
+import pprint
 import re
 import requests
 import sys
@@ -21,7 +22,7 @@ def toVisibleAscll(src):
     if unicode != type(src):
         try:
             src = unicode(src, errors='ignore')
-        except TypeError, e: 
+        except TypeError, e:
             print 'Unable to translate {!r} of type {}'.format(src, type(src)), ':', e
 
     dest = ''
@@ -146,6 +147,48 @@ def dump(obj):
             dump(subObj)
     else:
         print dumpObj(obj)
+
+def printDict(obj):
+    UniPrinter().pprint(obj)
+
+class UniPrinter(pprint.PrettyPrinter):
+
+    def format(self, obj, context, maxlevels, level):
+
+        if isinstance(obj, unicode):
+
+            out = cStringIO.StringIO()
+            out.write('u"')
+
+            for c in obj:
+                if ord(c) < 32 or c in u'"\\':
+                    out.write('\\x%.2x' % ord(c))
+                else:
+                    out.write(c.encode("utf-8"))
+
+            out.write('"''"')
+
+            # result, readable, recursive
+            return out.getvalue(), True, False
+
+        if isinstance(obj, str):
+
+            out = cStringIO.StringIO()
+            out.write('"')
+
+            for c in obj:
+                if ord(c) < 32 or c in '"\\':
+                    out.write('\\x%.2x' % ord(c))
+                else:
+                    out.write(c)
+
+            out.write('"')
+
+            # result, readable, recursive
+            return out.getvalue(), True, False
+
+        return pprint.PrettyPrinter.format(self, obj,
+            context, maxlevels, level)
 
 class AutoReleaseThread(threading.Thread):
 
@@ -312,7 +355,7 @@ class UrlUtils:
         HEADERS = {
             'Referer': UrlUtils.SHORT_URL_REFERER,
             'User-Agent': UrlUtils.SHORT_URL_USER_AGENT
-        } 
+        }
 
         params = {'source': UrlUtils.SHORT_URL_SOURCE,
             'url_long': originalUrl,
