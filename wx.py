@@ -1,14 +1,7 @@
 # -*- coding:utf-8 -*-
 
-import codecs
-import io
-import os
 import random
-import re
-import urllib2
-
 import requests
-import datetime
 import itchat
 import time
 
@@ -20,17 +13,6 @@ class WX:
     def __init__(self, configFile):
 
         self.configFile = configFile
-
-        self.jk_name = getProperty(self.configFile, 'wechat-input-groups').split(';')
-        self.jk_id = list()
-
-        self.ng_name = getProperty(self.configFile, 'wechat-output-groups').split(';')
-        self.ng_id = list()
-
-        self.set_skuid = set([])
-
-        self.toGroups = list()
-
         self.messageCenter = MessageCenter(configFile)
 
     def login(self):
@@ -39,69 +21,54 @@ class WX:
 
         itchat.auto_login(hotReload=True, statusStorageDir=statusFile)
 
-        for name in self.ng_name:
+        self.fromGroups = list()
+        names = getProperty(self.configFile, 'wechat-input-groups').split(';')
+        for name in names:
+            group = itchat.search_chatrooms(name=name)
+            self.fromGroups.extend(group)
+
+        self.toGroups = list()
+        names = getProperty(self.configFile, 'wechat-output-groups').split(';')
+        for name in names:
             group = itchat.search_chatrooms(name=name)
             self.toGroups.extend(group)
 
-        print self.toGroups
+        print self.fromGroups, '\n', self.toGroups
 
         itchat.run()
 
-    def get_jkid(self):
-        jk_list = []
-        jk_id = []
-        for i in range(len(self.jk_name)):
-            jk_list.append(itchat.search_chatrooms(name=self.jk_name[i]))
-            # print(jk_list)
-            jk_id.append(jk_list[i][0]['UserName'])
-
-        return jk_id
-
     def text(self, msg):
-
-        #XXX: Move to message center
-        print(self.set_skuid)
-
-        #XXX: Reset skuids every 3:00 am
-        #TODO: Bad design makes human confused
-        now_time = datetime.datetime.now()
-        reg_time = r'20\w\w-\w\w-\w\w 03:0[0-1]:00\S+'
-        result_time = re.findall(reg_time, str(now_time))
-        if len(result_time) > 0:
-            self.set_skuid.clear()
-        text = ''
-        if len(self.jk_id) != len(self.jk_name):
-            self.jk_id = self.get_jkid()
 
         print msg['Content']
 
-        for i in range(len(self.jk_id)):
+        fromGroupName = msg['FromUserName']
 
-            print i, self.jk_id[i], msg['FromUserName']
-            if msg['FromUserName'] == self.jk_id[i]:
+        print fromGroupName
 
-                message = self.messageCenter.translate(msg['Content'])
+        if '@51a3bda21ad4580153aaf90423c862f9' != fromGroupName:
 
-                if message is None:
-                    continue
+            for group in self.fromGroups:
+                if fromGroupName == group['UserName']:
+                    break
+            else: # Not found
+                return
 
-                # XXX: Move to message center
-                if message.skuid in list(self.set_skuid):
-                    continue
+        message = self.messageCenter.translate(msg['Content'])
 
-                self.set_skuid.add(message.skuid)
+        if message is None:
+            return
 
-                for group in self.toGroups:
+        for group in self.toGroups:
 
-                    interval = random.random() * 10
-                    time.sleep(interval)
+            interval = random.random() * 10
+            time.sleep(interval)
 
-                    ret = group.send(message.text)
-                    print 'Send', message.text, ':', ret
+            ret = group.send(message.text)
+            print 'Send', message.text, ':', ret
 
-                    interval = random.random() * 10
-                    time.sleep(interval)
+            interval = random.random() * 10
+            time.sleep(interval)
 
-                    ret = group.send_image(message.img)
-                    print 'Send', message.img, ':', ret
+            ret = group.send_image(message.img)
+            print 'Send', message.img, ':', ret
 

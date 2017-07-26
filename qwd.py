@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 
+import codecs
 import json
 import random
 import re
@@ -84,6 +85,11 @@ class QWD:
 
         return True
 
+    @staticmethod
+    def isValidShareUrl(url):
+        pattern = r'(https://union-click\.jd\.com/jdc\?d=\w+)'
+        return re.match(pattern, url) is not None
+
     def getShareUrl(self, skuid):
 
         url = self.shareUrl.format(skuid)
@@ -134,33 +140,6 @@ class QWD:
 
         return skuId
 
-    @staticmethod
-    def check_msg(msg):
-        reg = r'https://union-click\.jd\.com'
-        result = re.findall(reg, msg)
-        if len(result)>0:
-            return True
-        else:
-            return False
-
-    @staticmethod
-    def get_new_msg(msg, result):
-
-        text = ''
-        for i in range(len(result)):
-            req = urllib2.Request(str(result[i]))
-            res = urllib2.urlopen(req)
-            html = res.read()
-            reg = r"hrl='https://union-click\.jd\.com\S+&d=(\S\S\S\S\S\S)'"
-            result = re.findall(reg, html)[0]
-
-            url = 'https://union-click.jd.com/jdc?d=' + str(result)
-
-            text = msg.replace(str(result[i]), url)
-            msg = text
-
-        return text
-
     def getImage(self, skuid):
 
         url = self.imageUrl.format(random.randint(1000000000, 9999999999), skuid)
@@ -177,4 +156,11 @@ class QWD:
         img = getMatchString(html, r'skuimgurl":"(https://img\S+)",')
 
         return img
+
+    def saveImage(self, path, skuid):
+
+        with codecs.open(path, 'wb') as fp:
+
+            url = self.getImage(skuid)
+            fp.write(urllib2.urlopen(url).read())
 

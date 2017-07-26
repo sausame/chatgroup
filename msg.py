@@ -1,62 +1,67 @@
 # -*- coding:utf-8 -*-
 
-import codecs
-import io
 import os
-import random
 import re
-import urllib2
-
 import requests
-import datetime
 import itchat
 import time
 
-from itchat.content import TEXT
+from datetime import timedelta, datetime
 from qwd import QWD
-from utils import getProperty
+from utils import getProperty, UrlUtils
 
 class Message:
 
     def __init__(self, qwd):
         self.qwd = qwd
 
+    def translateUrl(self, url):
+
+        skuid = self.qwd.getSkuId(url)
+
+        skuurl = self.qwd.getShareUrl(skuid)
+
+        if not os.path.exists('img'):
+            os.mkdir('img')
+
+        img = 'img/{0}.jpg'.format(skuid)
+
+        self.qwd.saveImage(img, skuid)
+
+        print skuid, skuurl, img
+
+        return skuid, skuurl, img
+
     def translate(self, msg):
 
-        # print('------测试-----' + msg['Content'])
-        reg_url_cn = r'(http://url\.cn/\S\S\S\S\S\S\S)'
-        result = re.findall(reg_url_cn, msg)
-        # print(result)
-        if len(result)>0:
-            text = QWD.get_new_msg(msg, result)
-        else:
-            text = msg
+        lastEnd = 0
+        self.text = ''
 
-        # print(text)
-        https_result = re.findall(r'(https://union-click\.jd\.com/jdc\?d=\S\S\S\S\S\S)', text)
-        print text, https_result
+        for m in re.finditer(UrlUtils.HTTP_URL_PATTERN, msg):
 
-        if len(https_result) == 0:
-            return None
+            self.text += msg[lastEnd:m.start()]
+            lastEnd = m.end() + 1
 
-        for i in range(len(https_result)):
-            self.skuid = self.qwd.getSkuId(str(https_result[i]))
-            skuurl = self.qwd.getShareUrl(self.skuid)
-            money_msg = text.replace(https_result[i], skuurl)
-            self.text = money_msg
+            url = m.group(0)
 
-            url_img = self.qwd.getImage(self.skuid)
+            if UrlUtils.isShortUrl(url) is not None:
+                originalUrl = UrlUtils.toOriginalUrl(url)
+            else:
+                originalUrl = url
 
-            self.img = 'img/{0}.jpg'.format(self.skuid)
-            if not os.path.exists('img'):
-                os.mkdir('img')
+            print url, originalUrl
 
-            with codecs.open(self.img, 'wb') as f:
-                f.write(urllib2.urlopen(url_img).read())
+            if QWD.isValidShareUrl(url):
+                self.skuid, url, self.img = self.translateUrl(originalUrl)
 
-            print self.skuid, self.text, self.img
+            self.text += url
 
-        return self
+        if 0 == len(self.text):
+            return False
+
+        self.text += msg[lastEnd:]
+
+        return True
 
 class MessageCenter:
 
@@ -67,8 +72,43 @@ class MessageCenter:
         self.qwd = QWD(configFile)
         self.qwd.login()
 
+        self.skuIds = list()
+
+        self.resetTimestamp = None
+
+    def reset(self):
+
+        #XXX: Reset skuids every 3:00 am
+        RESET_HOUR = 3
+
+        now = datetime.now().replace(minute=0, second=0, microsecond=0)
+
+        if self.resetTimestamp is not None:
+
+            delta = now - self.resetTimestamp
+
+            if delta.days > 0:
+
+                self.skuIds.clear()
+                self.resetTimestamp = now.replace(hour=RESET_HOUR)
+
+        else:
+            self.resetTimestamp = now.replace(hour=RESET_HOUR)
+
     def translate(self, msg):
 
+        self.reset()
+
         message = Message(self.qwd)
-        return message.translate(msg)
+
+        if not message.translate(msg):
+            return None
+
+        if message.skuid in self.skuIds:
+            return None
+
+        self.skuIds.append(message.skuid)
+        self.skuIds.sort()
+
+        return message
 
