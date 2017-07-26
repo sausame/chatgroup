@@ -21,37 +21,42 @@ class WX:
 
         itchat.auto_login(hotReload=True, statusStorageDir=statusFile)
 
+        self.me = itchat.search_friends()
+
+        print self.me['NickName'], 'is working'
+
         self.fromGroups = list()
         names = getProperty(self.configFile, 'wechat-input-groups').split(';')
         for name in names:
-            group = itchat.search_chatrooms(name=name)
-            self.fromGroups.extend(group)
+            groups = itchat.search_chatrooms(name=name)
+            self.fromGroups.extend(groups)
 
         self.toGroups = list()
         names = getProperty(self.configFile, 'wechat-output-groups').split(';')
         for name in names:
-            group = itchat.search_chatrooms(name=name)
-            self.toGroups.extend(group)
-
-        print self.fromGroups, '\n', self.toGroups
+            groups = itchat.search_chatrooms(name=name)
+            self.toGroups.extend(groups)
 
         itchat.run()
 
     def text(self, msg):
 
+        fromGroupName = msg['User']['UserName']
+
+        for group in self.fromGroups:
+
+            if fromGroupName == group['UserName']:
+                break
+        else: # Not found
+            return
+
+        user = itchat.search_friends(userName=msg['ActualUserName'])
+
+        print '\n================================================================\n'
+        print 'In', group['NickName'], ',', user['NickName'], 'sends a message:\n'
+        print '----------------------------------------------------------------\n'
         print msg['Content']
-
-        fromGroupName = msg['FromUserName']
-
-        print fromGroupName
-
-        if '@51a3bda21ad4580153aaf90423c862f9' != fromGroupName:
-
-            for group in self.fromGroups:
-                if fromGroupName == group['UserName']:
-                    break
-            else: # Not found
-                return
+        print '\n================================================================\n'
 
         message = self.messageCenter.translate(msg['Content'])
 
