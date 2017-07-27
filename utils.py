@@ -257,23 +257,18 @@ class AutoReleaseThread(threading.Thread):
 
 class ThreadWritableObject(threading.Thread):
 
-    def __init__(self, configFile, clientVersion='', build=''):
+    def __init__(self, configFile):
 
         threading.Thread.__init__(self)
 
         self.running = True
 
         outputPath = getProperty(configFile, 'output-path')
+        outputPath = os.path.realpath(outputPath)
+        outputPath = os.path.join(outputPath, 'logs')
 
-        if '' != clientVersion:
-
-            if '' != build:
-                outputPath = os.path.join(outputPath, '{}-{}'.format(clientVersion, build))
-            else:
-                outputPath = os.path.join(outputPath, '{}'.format(clientVersion))
-
-            if not os.path.exists(outputPath):
-                os.mkdir(outputPath, 0755)
+        if not os.path.exists(outputPath):
+            os.mkdir(outputPath, 0755)
 
         self.path = os.path.join(outputPath, 'sys.log')
         self.contents = []

@@ -130,7 +130,7 @@ class QWD:
             print 'Unable to get sharing URL for "', skuid, '" with an error (', r.status_code, '):\n', r.text
 
             # XXX: Relogin, but let this message failed because of less complicated logistic
-            self.login() 
+            self.login()
             return None
 
         return obj.pop('skuurl')
