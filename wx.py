@@ -51,11 +51,11 @@ class WX:
 
         user = itchat.search_friends(userName=msg['ActualUserName'])
 
-        print '\n================================================================\n'
-        print 'In', group['NickName'], ',', user['NickName'], 'sends a message:\n'
-        print '----------------------------------------------------------------\n'
+        print '================================================================'
+        print 'In', group['NickName'], ',', user['NickName'], 'sends a message:'
+        print '----------------------------------------------------------------'
         print msg['Content']
-        print '\n================================================================\n'
+        print '================================================================'
 
         message = self.messageCenter.translate(msg['Content'])
 
@@ -64,15 +64,24 @@ class WX:
 
         for group in self.toGroups:
 
+            print '================================================================'
+            print 'Send a message to', group['NickName']
+
             interval = random.random() * 10
             time.sleep(interval)
 
             ret = group.send(message.text)
-            print 'Send', message.text, ':', ret
+
+            print 'Result of text message:', ret['BaseResponse']['ErrMsg']
+            print '----------------------------------------------------------------'
+            print message.text
+            print '----------------------------------------------------------------'
 
             interval = random.random() * 10
             time.sleep(interval)
 
             ret = group.send_image(message.img)
-            print 'Send', message.img, ':', ret
+            print 'Result of', message.img, ':', ret['BaseResponse']['ErrMsg']
+
+            print '================================================================'
 
