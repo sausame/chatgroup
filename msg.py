@@ -11,20 +11,18 @@ from utils import getProperty, UrlUtils
 
 class Message:
 
-    def __init__(self, qwd):
+    def __init__(self, qwd, imageDir):
+
         self.qwd = qwd
+        self.imageDir = imageDir
 
     def translateUrl(self, url):
 
         skuid = self.qwd.getSkuId(url)
 
         skuurl = self.qwd.getShareUrl(skuid)
-
-        if not os.path.exists('img'):
-            os.mkdir('img')
-
-        img = 'img/{0}.jpg'.format(skuid)
-
+        
+        img = os.path.join(self.imageDir, '{0}.jpg'.format(skuid))
         self.qwd.saveImage(img, skuid)
 
         return skuid, skuurl, img
@@ -81,6 +79,13 @@ class MessageCenter:
 
         self.resetTimestamp = None
 
+        outputPath = getProperty(configFile, 'output-path')
+        outputPath = os.path.realpath(outputPath)
+        self.imageDir = os.path.join(outputPath, 'imgs')
+
+        if not os.path.exists(self.imageDir):
+            os.mkdir(self.imageDir, 0755)
+
     def reset(self):
 
         #XXX: Reset skuids every 3:00 am
@@ -104,7 +109,7 @@ class MessageCenter:
 
         self.reset()
 
-        message = Message(self.qwd)
+        message = Message(self.qwd, self.imageDir)
 
         if not message.translate(msg):
             return None
