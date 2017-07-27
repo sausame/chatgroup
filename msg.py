@@ -39,7 +39,7 @@ class Message:
         for m in re.finditer(UrlUtils.HTTP_URL_PATTERN, msg):
 
             self.text += msg[lastEnd:m.start()]
-            lastEnd = m.end() + 1
+            lastEnd = m.end()
 
             url = m.group(0)
 
