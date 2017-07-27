@@ -27,8 +27,6 @@ class Message:
 
         self.qwd.saveImage(img, skuid)
 
-        print skuid, skuurl, img
-
         return skuid, skuurl, img
 
     def translate(self, msg):
@@ -45,13 +43,21 @@ class Message:
 
             if UrlUtils.isShortUrl(url) is not None:
                 originalUrl = UrlUtils.toOriginalUrl(url)
+                print '----------------------------------------------------------------'
+                print 'Short    Url:', url
+                print 'Original Url:', originalUrl
+                print '----------------------------------------------------------------'
             else:
                 originalUrl = url
 
-            print url, originalUrl
-
             if QWD.isValidShareUrl(url):
                 self.skuid, url, self.img = self.translateUrl(originalUrl)
+                print '----------------------------------------------------------------'
+                print 'SKU       ID:', self.skuid
+                print 'Original Url:', originalUrl
+                print "Owner's  Url:", url
+                print 'Image   Path:', self.img
+                print '----------------------------------------------------------------'
 
             self.text += url
 
