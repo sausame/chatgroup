@@ -1,4 +1,5 @@
-#!/usr/bin/python2.7
+#!/usr/bin/env python
+# -*- coding:utf-8 -*-
 
 import itchat
 import sys
